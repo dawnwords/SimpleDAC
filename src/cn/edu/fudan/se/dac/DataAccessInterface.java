@@ -14,12 +14,15 @@ public interface DataAccessInterface<Bean> {
 
     boolean deleteByCondition(Condition<Bean> condition, Class<Bean> beanClass);
 
-    boolean updateByCondition(Condition<Bean> condition, Class<Bean> beanClass,
-                              String updateFieldName, Object updateValue);
+    boolean updateByCondition(Condition<Bean> condition, Class<Bean> beanClass, BeanSetter<Bean> setter);
 
     List<Bean> selectByCondition(Condition<Bean> condition, Class<Bean> beanClass);
 
     interface Condition<Bean> {
         boolean assertBean(Bean bean);
+    }
+
+    interface BeanSetter<Bean> {
+        void set(Bean bean);
     }
 }
