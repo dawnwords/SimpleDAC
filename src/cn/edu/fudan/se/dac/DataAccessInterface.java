@@ -12,10 +12,14 @@ public interface DataAccessInterface<Bean> {
 
     boolean add(Bean bean);
 
-    boolean deleteByField(String fieldName, Object value, Class<Bean> beanClass);
+    boolean deleteByCondition(Condition<Bean> condition, Class<Bean> beanClass);
 
-    boolean updateByField(String selectFieldName, Object selectValue, Class<Bean> beanClass,
-                          String updateFieldName, Object updateValue);
+    boolean updateByCondition(Condition<Bean> condition, Class<Bean> beanClass,
+                              String updateFieldName, Object updateValue);
 
-    List<Bean> selectByField(String fieldName, Object value, Class<Bean> beanClass);
+    List<Bean> selectByCondition(Condition<Bean> condition, Class<Bean> beanClass);
+
+    interface Condition<Bean> {
+        boolean assertBean(Bean bean);
+    }
 }

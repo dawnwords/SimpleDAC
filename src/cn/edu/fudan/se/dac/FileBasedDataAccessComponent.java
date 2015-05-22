@@ -51,7 +51,6 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
     }
 
-
     @Override
     public boolean beginTransaction() {
         try {
@@ -75,18 +74,18 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     }
 
     @Override
-    public boolean deleteByField(final String fieldName, final Object value, final Class<Bean> beanClass) {
+    public boolean deleteByCondition(final Condition<Bean> condition, final Class<Bean> beanClass) {
         return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(BufferedWriter writer) {
-                return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer), new EqualFilter(beanClass, value, fieldName));
+                return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer), new ConditionFilter(beanClass, condition));
             }
         });
     }
 
     @Override
-    public boolean updateByField(final String selectFieldName, final Object selectValue, final Class<Bean> beanClass,
-                                 final String updateFieldName, final Object updateValue) {
+    public boolean updateByCondition(final Condition<Bean> condition, final Class<Bean> beanClass,
+                                     final String updateFieldName, final Object updateValue) {
         return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(final BufferedWriter writer) {
@@ -100,20 +99,20 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
                         writer.write(gson.toJson(bean));
                         writer.newLine();
                     }
-                }, new EqualFilter(beanClass, selectValue, selectFieldName));
+                }, new ConditionFilter(beanClass, condition));
             }
         });
     }
 
     @Override
-    public List<Bean> selectByField(String fieldName, Object value, final Class<Bean> beanClass) {
+    public List<Bean> selectByCondition(final Condition<Bean> condition, final Class<Bean> beanClass) {
         final List<Bean> result = new ArrayList<Bean>();
         FileUtil.eachLine(getDataFile(), new FileUtil.LineHandler() {
             @Override
             public void handle(String line) throws Exception {
                 result.add(gson.fromJson(line, beanClass));
             }
-        }, new EqualFilter(beanClass, value, fieldName));
+        }, new ConditionFilter(beanClass, condition));
         return result;
     }
 
@@ -121,27 +120,18 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         return transaction ? tempFile : dataFile;
     }
 
-    private class EqualFilter implements FileUtil.LineFilter {
+    private class ConditionFilter implements FileUtil.LineFilter {
         private Class<Bean> beanClass;
-        private Object value;
-        private String fieldName;
+        private Condition<Bean> condition;
 
-        public EqualFilter(Class<Bean> beanClass, Object value, String fieldName) {
+        public ConditionFilter(Class<Bean> beanClass, Condition<Bean> condition) {
             this.beanClass = beanClass;
-            this.value = value;
-            this.fieldName = fieldName;
+            this.condition = condition;
         }
 
         @Override
         public boolean filter(String line) {
-            Bean bean = gson.fromJson(line, beanClass);
-            try {
-                Field field = beanClass.getField(fieldName);
-                field.setAccessible(true);
-                return field.get(bean).equals(value);
-            } catch (Exception e) {
-                return false;
-            }
+            return condition.assertBean(gson.fromJson(line, beanClass));
         }
     }
 }
