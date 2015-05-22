@@ -64,7 +64,7 @@ class FileUtil {
         BufferedWriter writer = null;
         boolean result = false;
         try {
-            writer = new BufferedWriter(new FileWriter(file));
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "utf-8"));
             result = handler.handle(writer);
         } catch (Exception ignore) {
             return false;
