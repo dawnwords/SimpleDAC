@@ -33,12 +33,8 @@ public class DACFactory {
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            if (method.getName().contains("ByField")) {
-                Object fieldName = args[0];
-                Object beanClass = args[2];
-                if (fieldName == null) {
-                    throw new RuntimeException("fieldName can not be null");
-                }
+            if (method.getName().contains("ByCondition")) {
+                Object beanClass = args[1];
                 if (beanClass == null) {
                     throw new RuntimeException("beanClass can not be null");
                 }
