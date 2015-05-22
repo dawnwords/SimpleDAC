@@ -17,7 +17,7 @@ public class DACFactory {
         return instance == null ? (instance = new DACFactory()) : instance;
     }
 
-    public <T> DataAccessInterface<T> newInstance(Class<T> beanClass) {
+    public <T> DataAccessInterface<T> createDAC(Class<T> beanClass) {
         FileBasedDataAccessComponent<T> result = new FileBasedDataAccessComponent<T>(beanClass.getSimpleName());
         return (DataAccessInterface<T>) new DACHandler().newProxyInstance(result);
     }
