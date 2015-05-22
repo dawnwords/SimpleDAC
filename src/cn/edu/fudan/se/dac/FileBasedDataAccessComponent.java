@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,8 +32,6 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         boolean oldExists = oldFile.exists();
         boolean tempExists = tempFile.exists();
 
-        changeTempFile.deleteOnExit();
-
         if (tempExists) {
             if (dataExists) {
                 tempFile.delete();
@@ -45,16 +42,19 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             if (oldExists) {
                 oldFile.delete();
             }
+        } else if (changeTempFile.exists()) {
+            changeTempFile.renameTo(dataFile);
         } else {
             dataFile = FileUtil.createFileIfNotExist(dataFileName);
         }
 
+        changeTempFile.deleteOnExit();
     }
 
     @Override
     public boolean beginTransaction() {
         try {
-            transaction = FileUtil.copy(dataFile, tempFile, null);
+            transaction = FileUtil.copy(dataFile, tempFile);
             return transaction;
         } catch (Exception e) {
             return false;
@@ -78,30 +78,26 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(BufferedWriter writer) {
-                return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer), new ConditionFilter(beanClass, condition));
+                return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer), new ConditionFilter(condition, beanClass));
             }
-        });
+        }) && FileUtil.overwrite(changeTempFile, getDataFile());
     }
 
     @Override
-    public boolean updateByCondition(final Condition<Bean> condition, final Class<Bean> beanClass,
-                                     final String updateFieldName, final Object updateValue) {
-        return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
+    public boolean updateByCondition(final Condition<Bean> condition, final Class<Bean> beanClass, final BeanSetter<Bean> setter) {
+        return setter == null || (FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(final BufferedWriter writer) {
-                return FileUtil.eachLine(getDataFile(), new FileUtil.LineHandler() {
+                return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer) {
                     @Override
-                    public void handle(String line) throws Exception {
+                    public void filter(String line) throws Exception {
                         Bean bean = gson.fromJson(line, beanClass);
-                        Field field = beanClass.getField(updateFieldName);
-                        field.setAccessible(true);
-                        field.set(bean, updateValue);
-                        writer.write(gson.toJson(bean));
-                        writer.newLine();
+                        setter.set(bean);
+                        keep(gson.toJson(bean));
                     }
-                }, new ConditionFilter(beanClass, condition));
+                }, new ConditionFilter(condition, beanClass));
             }
-        });
+        }) && FileUtil.overwrite(changeTempFile, getDataFile()));
     }
 
     @Override
@@ -109,29 +105,34 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         final List<Bean> result = new ArrayList<Bean>();
         FileUtil.eachLine(getDataFile(), new FileUtil.LineHandler() {
             @Override
-            public void handle(String line) throws Exception {
+            public void filter(String line) throws Exception {
                 result.add(gson.fromJson(line, beanClass));
             }
-        }, new ConditionFilter(beanClass, condition));
+
+            @Override
+            public void keep(String line) throws Exception {
+            }
+        }, new ConditionFilter(condition, beanClass));
         return result;
+    }
+
+    private class ConditionFilter implements FileUtil.LineFilter {
+
+        private Condition<Bean> condition;
+        private Class<Bean> beanClass;
+
+        public ConditionFilter(Condition<Bean> condition, Class<Bean> beanClass) {
+            this.condition = condition;
+            this.beanClass = beanClass;
+        }
+
+        @Override
+        public boolean shouldBeFiltered(String line) {
+            return condition == null || condition.assertBean(gson.fromJson(line, beanClass));
+        }
     }
 
     private File getDataFile() {
         return transaction ? tempFile : dataFile;
-    }
-
-    private class ConditionFilter implements FileUtil.LineFilter {
-        private Class<Bean> beanClass;
-        private Condition<Bean> condition;
-
-        public ConditionFilter(Class<Bean> beanClass, Condition<Bean> condition) {
-            this.beanClass = beanClass;
-            this.condition = condition;
-        }
-
-        @Override
-        public boolean filter(String line) {
-            return condition.assertBean(gson.fromJson(line, beanClass));
-        }
     }
 }

@@ -19,11 +19,11 @@ class FileUtil {
         return file;
     }
 
-    static boolean copy(final File src, File dst, final LineFilter filter) {
+    static boolean copy(final File src, File dst) {
         return getBufferedWriter(dst, new BufferedWriterHandler() {
             @Override
             public boolean handle(BufferedWriter writer) {
-                return eachLine(src, new OutputLineHandler(writer), filter);
+                return eachLine(src, new OutputLineHandler(writer), null);
             }
         });
     }
@@ -34,8 +34,10 @@ class FileUtil {
             in = new BufferedReader(new FileReader(file));
             String line;
             while ((line = in.readLine()) != null) {
-                if (filter != null && filter.filter(line)) {
-                    handler.handle(line);
+                if (filter != null && filter.shouldBeFiltered(line)) {
+                    handler.filter(line);
+                } else {
+                    handler.keep(line);
                 }
             }
         } catch (Exception e) {
@@ -51,7 +53,7 @@ class FileUtil {
             @Override
             public boolean handle(BufferedWriter writer) {
                 try {
-                    new OutputLineHandler(writer).handle(line);
+                    new OutputLineHandler(writer).keep(line);
                 } catch (Exception e) {
                     return false;
                 }
@@ -85,16 +87,22 @@ class FileUtil {
         return true;
     }
 
+    static boolean overwrite(File src, File dst) {
+        return dst.delete() && src.renameTo(dst);
+    }
+
     interface BufferedWriterHandler {
         boolean handle(BufferedWriter writer);
     }
 
     interface LineHandler {
-        void handle(String line) throws Exception;
+        void filter(String line) throws Exception;
+
+        void keep(String line) throws Exception;
     }
 
     interface LineFilter {
-        boolean filter(String line);
+        boolean shouldBeFiltered(String line);
     }
 
     static class OutputLineHandler implements LineHandler {
@@ -105,7 +113,11 @@ class FileUtil {
         }
 
         @Override
-        public void handle(String line) throws Exception {
+        public void filter(String line) throws Exception {
+        }
+
+        @Override
+        public void keep(String line) throws Exception {
             writer.write(line);
             writer.newLine();
         }
