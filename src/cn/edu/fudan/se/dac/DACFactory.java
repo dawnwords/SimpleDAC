@@ -18,7 +18,7 @@ public class DACFactory {
     }
 
     public <T> DataAccessInterface<T> createDAC(Class<T> beanClass) {
-        FileBasedDataAccessComponent<T> result = new FileBasedDataAccessComponent<T>(beanClass.getSimpleName());
+        FileBasedDataAccessComponent<T> result = new FileBasedDataAccessComponent<T>(beanClass);
         return (DataAccessInterface<T>) new DACHandler().newProxyInstance(result);
     }
 
@@ -34,9 +34,9 @@ public class DACFactory {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
             if (method.getName().contains("ByCondition")) {
-                Object beanClass = args[1];
-                if (beanClass == null) {
-                    throw new RuntimeException("beanClass can not be null");
+                Object condition = args[0];
+                if (condition == null) {
+                    throw new RuntimeException("condition can not be null");
                 }
             }
             return method.invoke(target, args);

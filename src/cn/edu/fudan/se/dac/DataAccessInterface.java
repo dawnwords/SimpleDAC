@@ -10,19 +10,14 @@ public interface DataAccessInterface<Bean> {
 
     boolean commit();
 
+    boolean rollback();
+
     boolean add(Bean bean);
 
-    boolean deleteByCondition(Condition<Bean> condition, Class<Bean> beanClass);
+    boolean deleteByCondition(Condition<Bean> condition);
 
-    boolean updateByCondition(Condition<Bean> condition, Class<Bean> beanClass, BeanSetter<Bean> setter);
+    boolean updateByCondition(Condition<Bean> condition, BeanSetter<Bean> setter);
 
-    List<Bean> selectByCondition(Condition<Bean> condition, Class<Bean> beanClass);
+    List<Bean> selectByCondition(Condition<Bean> condition);
 
-    interface Condition<Bean> {
-        boolean assertBean(Bean bean);
-    }
-
-    interface BeanSetter<Bean> {
-        void set(Bean bean);
-    }
 }

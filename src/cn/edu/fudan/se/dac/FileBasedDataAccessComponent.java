@@ -19,10 +19,13 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     private File dataFile, oldFile, tempFile, changeTempFile;
     private Gson gson;
     private boolean transaction;
+    private Class<Bean> beanClass;
 
-    public FileBasedDataAccessComponent(String dataFileName) {
+    FileBasedDataAccessComponent(Class<Bean> beanClass) {
+        this.beanClass = beanClass;
         gson = new Gson();
 
+        String dataFileName = beanClass.getSimpleName();
         dataFile = new File(dataFileName);
         oldFile = new File(dataFileName + OLD_EXT);
         tempFile = new File(dataFileName + TEMP_EXT);
@@ -68,13 +71,19 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     }
 
     @Override
+    public boolean rollback() {
+        transaction = false;
+        return tempFile.delete();
+    }
+
+    @Override
     public boolean add(Bean bean) {
         String json = gson.toJson(bean);
         return FileUtil.appendLine(getDataFile(), json);
     }
 
     @Override
-    public boolean deleteByCondition(final Condition<Bean> condition, final Class<Bean> beanClass) {
+    public boolean deleteByCondition(final Condition<Bean> condition) {
         return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(BufferedWriter writer) {
@@ -84,7 +93,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     }
 
     @Override
-    public boolean updateByCondition(final Condition<Bean> condition, final Class<Bean> beanClass, final BeanSetter<Bean> setter) {
+    public boolean updateByCondition(final Condition<Bean> condition, final BeanSetter<Bean> setter) {
         return setter == null || (FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
             @Override
             public boolean handle(final BufferedWriter writer) {
@@ -101,7 +110,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     }
 
     @Override
-    public List<Bean> selectByCondition(final Condition<Bean> condition, final Class<Bean> beanClass) {
+    public List<Bean> selectByCondition(final Condition<Bean> condition) {
         final List<Bean> result = new ArrayList<Bean>();
         FileUtil.eachLine(getDataFile(), new FileUtil.LineHandler() {
             @Override
@@ -128,7 +137,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         @Override
         public boolean shouldBeFiltered(String line) {
-            return condition == null || condition.assertBean(gson.fromJson(line, beanClass));
+            return condition.assertBean(gson.fromJson(line, beanClass));
         }
     }
 
