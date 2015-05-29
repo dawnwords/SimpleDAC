@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>cn.edu.fudan.se</groupId>
-    <artifactId>data-access-component</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>dac</artifactId>
+    <version>1.0-beta</version>
 
     <dependencies>
         <dependency>
