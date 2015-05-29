@@ -6,11 +6,11 @@ package cn.edu.fudan.se.dac;
 public interface Condition<Bean> {
     boolean assertBean(Bean bean);
 
-    class True<Bean> implements Condition<Bean>{
+    Condition True = new Condition() {
         @Override
-        public boolean assertBean(Bean bean) {
+        public boolean assertBean(Object bean) {
             return true;
         }
-    }
+    };
 
 }
