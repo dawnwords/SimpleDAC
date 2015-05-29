@@ -1,6 +1,6 @@
 package cn.edu.fudan.se.dac;
 
-import com.google.gson.Gson;
+import com.alibaba.fastjson.JSON;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -17,13 +17,11 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     private static final String CHANGE_TEMP_EXT = ".ctmp";
 
     private File dataFile, oldFile, tempFile, changeTempFile;
-    private Gson gson;
     private boolean transaction;
     private Class<Bean> beanClass;
 
     FileBasedDataAccessComponent(Class<Bean> beanClass) {
         this.beanClass = beanClass;
-        gson = new Gson();
 
         String dataFileName = beanClass.getSimpleName();
         dataFile = new File(dataFileName);
@@ -78,7 +76,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
     @Override
     public boolean add(Bean bean) {
-        String json = gson.toJson(bean);
+        String json = JSON.toJSONString(bean);
         return FileUtil.appendLine(getDataFile(), json);
     }
 
@@ -100,9 +98,9 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
                 return FileUtil.eachLine(getDataFile(), new FileUtil.OutputLineHandler(writer) {
                     @Override
                     public void filter(String line) throws Exception {
-                        Bean bean = gson.fromJson(line, beanClass);
+                        Bean bean = JSON.parseObject(line, beanClass);
                         setter.set(bean);
-                        keep(gson.toJson(bean));
+                        keep(JSON.toJSONString(bean));
                     }
                 }, new ConditionFilter(condition, beanClass));
             }
@@ -115,7 +113,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         FileUtil.eachLine(getDataFile(), new FileUtil.LineHandler() {
             @Override
             public void filter(String line) throws Exception {
-                result.add(gson.fromJson(line, beanClass));
+                result.add(JSON.parseObject(line, beanClass));
             }
 
             @Override
@@ -137,7 +135,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         @Override
         public boolean shouldBeFiltered(String line) {
-            return condition.assertBean(gson.fromJson(line, beanClass));
+            return condition.assertBean(JSON.parseObject(line, beanClass));
         }
     }
 
