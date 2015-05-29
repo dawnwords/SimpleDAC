@@ -31,7 +31,7 @@ public class TestDAC {
         condition = new Condition<Student>() {
             @Override
             public boolean assertBean(Student student) {
-                return student.getName().contains("王");
+                return student.getName().contains("a");
             }
         };
         setter = new BeanSetter<Student>() {
