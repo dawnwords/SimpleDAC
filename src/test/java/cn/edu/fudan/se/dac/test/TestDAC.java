@@ -12,6 +12,8 @@ import org.junit.internal.runners.TestClassRunner;
 import org.junit.runner.RunWith;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -71,6 +73,29 @@ public class TestDAC {
         for (Student student : dac.selectByCondition(Condition.True)) {
             assertTrue(!condition.assertBean(student));
         }
+    }
+
+    @Test
+    public void testMultiThreading() throws InterruptedException {
+        final int studentNum = 10;
+        final int threadNum = 100;
+        List<Thread> threads = new ArrayList<Thread>();
+        for (int i = 0; i < threadNum; i++) {
+            Thread thread = new Thread() {
+                @Override
+                public void run() {
+                    for (Student student : StudentGenerator.getInstance().randomStudent(studentNum)) {
+                        dac.add(student);
+                    }
+                }
+            };
+            threads.add(thread);
+            thread.start();
+        }
+        for (Thread thread : threads) {
+            thread.join();
+        }
+        assertEquals(threadNum * studentNum, dac.selectByCondition(Condition.True).size());
     }
 
     @AfterClass
