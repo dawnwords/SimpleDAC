@@ -3,6 +3,7 @@ package cn.edu.fudan.se.dac;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by Dawnwords on 2015/5/22.
@@ -10,7 +11,10 @@ import java.lang.reflect.Proxy;
 public class DACFactory {
     private static DACFactory instance;
 
+    private ConcurrentHashMap<Class, DataAccessInterface> classDACMap;
+
     private DACFactory() {
+        classDACMap = new ConcurrentHashMap<Class, DataAccessInterface>();
     }
 
     public static DACFactory getInstance() {
@@ -18,8 +22,12 @@ public class DACFactory {
     }
 
     public <T> DataAccessInterface<T> createDAC(Class<T> beanClass) {
-        FileBasedDataAccessComponent<T> result = new FileBasedDataAccessComponent<T>(beanClass);
-        return (DataAccessInterface<T>) new DACHandler().newProxyInstance(result);
+        DataAccessInterface<T> result = classDACMap.get(beanClass);
+        if (result == null) {
+            result = (DataAccessInterface<T>) new DACHandler().newProxyInstance(new FileBasedDataAccessComponent<T>(beanClass));
+            classDACMap.put(beanClass, result);
+        }
+        return result;
     }
 
     private class DACHandler implements InvocationHandler {
