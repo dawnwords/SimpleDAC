@@ -17,7 +17,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
     private static final String TEMP_EXT = ".tmp";
 
-    private File dataFile, changeTempFile;
+    private File dataFile, tempFile;
     private List<Action> transaction;
     private Class<Bean> beanClass;
     private Lock readLock;
@@ -33,9 +33,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         }
 
         boolean execute() {
-            if (committing) {
-                return modifyLogic();
-            }
+            if (committing) return modifyLogic();
 
             if (transactionLock.isLocked()) {
                 transaction.add(this);
@@ -44,10 +42,9 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
             writeLock.lock();
             boolean result = modifyLogic();
-            if (createTemp) {
-                result = result && FileUtil.overwrite(changeTempFile, dataFile);
-            }
+            if (createTemp) result = result && FileUtil.overwrite(tempFile, dataFile);
             writeLock.unlock();
+
             return result;
         }
 
@@ -103,10 +100,15 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         @Override
         boolean modifyLogic() {
-            return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
+            return FileUtil.getBufferedWriter(tempFile, new FileUtil.BufferedWriterHandler() {
                 @Override
                 public boolean handle(BufferedWriter writer) {
-                    return FileUtil.eachLine(dataFile, new FileUtil.OutputLineHandler(writer), new ConditionFilter(condition, beanClass));
+                    return FileUtil.eachLine(dataFile, new FileUtil.OutputLineHandler(writer) {
+                        @Override
+                        public void doLine(String line) throws Exception {
+                            if (!condition.assertBean(JSON.parseObject(line, beanClass))) super.doLine(line);
+                        }
+                    });
                 }
             });
         }
@@ -135,17 +137,17 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         @Override
         boolean modifyLogic() {
-            return FileUtil.getBufferedWriter(changeTempFile, new FileUtil.BufferedWriterHandler() {
+            return FileUtil.getBufferedWriter(tempFile, new FileUtil.BufferedWriterHandler() {
                 @Override
                 public boolean handle(final BufferedWriter writer) {
                     return FileUtil.eachLine(dataFile, new FileUtil.OutputLineHandler(writer) {
                         @Override
-                        public void filter(String line) throws Exception {
+                        public void doLine(String line) throws Exception {
                             Bean bean = JSON.parseObject(line, beanClass);
-                            setter.set(bean);
-                            keep(JSON.toJSONString(bean));
+                            if (condition.assertBean(bean)) setter.set(bean);
+                            super.doLine(JSON.toJSONString(bean));
                         }
-                    }, new ConditionFilter(condition, beanClass));
+                    });
                 }
             });
         }
@@ -162,14 +164,14 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         String dataFileName = beanClass.getSimpleName();
         dataFile = new File(dataFileName);
-        changeTempFile = new File(dataFileName + TEMP_EXT);
+        tempFile = new File(dataFileName + TEMP_EXT);
 
 
         if (dataFile.exists()) {
-            changeTempFile.deleteOnExit();
+            tempFile.deleteOnExit();
         } else {
-            if (changeTempFile.exists()) {
-                FileUtil.overwrite(changeTempFile, dataFile);
+            if (tempFile.exists()) {
+                FileUtil.overwrite(tempFile, dataFile);
             } else {
                 dataFile = FileUtil.createFileIfNotExist(dataFileName);
             }
@@ -245,7 +247,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         FileUtil.eachLine(dataFile, new FileUtil.LineHandler() {
             @Override
-            public void filter(String line) throws Exception {
+            public void doLine(String line) throws Exception {
                 Bean bean = JSON.parseObject(line, beanClass);
                 if (transactionLock.isLocked()) {
                     for (Action action : transaction) {
@@ -257,11 +259,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
                     result.add(bean);
                 }
             }
-
-            @Override
-            public void keep(String line) throws Exception {
-            }
-        }, new ConditionFilter(Condition.True, beanClass));
+        });
 
         if (transactionLock.isLocked()) {
             traverseAddAction:
@@ -284,21 +282,5 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
         readLock.unlock();
         return result;
-    }
-
-    private class ConditionFilter implements FileUtil.LineFilter {
-
-        private Condition<Bean> condition;
-        private Class<Bean> beanClass;
-
-        public ConditionFilter(Condition<Bean> condition, Class<Bean> beanClass) {
-            this.condition = condition;
-            this.beanClass = beanClass;
-        }
-
-        @Override
-        public boolean shouldBeFiltered(String line) {
-            return condition.assertBean(JSON.parseObject(line, beanClass));
-        }
     }
 }

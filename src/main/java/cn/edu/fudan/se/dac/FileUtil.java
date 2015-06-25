@@ -23,22 +23,18 @@ class FileUtil {
         return getBufferedWriter(dst, new BufferedWriterHandler() {
             @Override
             public boolean handle(BufferedWriter writer) {
-                return eachLine(src, new OutputLineHandler(writer), null);
+                return eachLine(src, new OutputLineHandler(writer));
             }
         });
     }
 
-    static boolean eachLine(File file, LineHandler handler, LineFilter filter) {
+    static boolean eachLine(File file, LineHandler handler) {
         BufferedReader in = null;
         try {
             in = new BufferedReader(new FileReader(file));
             String line;
             while ((line = in.readLine()) != null) {
-                if (filter != null && filter.shouldBeFiltered(line)) {
-                    handler.filter(line);
-                } else {
-                    handler.keep(line);
-                }
+                handler.doLine(line);
             }
         } catch (Exception e) {
             return false;
@@ -53,7 +49,7 @@ class FileUtil {
             @Override
             public boolean handle(BufferedWriter writer) {
                 try {
-                    new OutputLineHandler(writer).keep(line);
+                    new OutputLineHandler(writer).doLine(line);
                 } catch (Exception e) {
                     return false;
                 }
@@ -96,13 +92,7 @@ class FileUtil {
     }
 
     interface LineHandler {
-        void filter(String line) throws Exception;
-
-        void keep(String line) throws Exception;
-    }
-
-    interface LineFilter {
-        boolean shouldBeFiltered(String line);
+        void doLine(String line) throws Exception;
     }
 
     static class OutputLineHandler implements LineHandler {
@@ -113,11 +103,7 @@ class FileUtil {
         }
 
         @Override
-        public void filter(String line) throws Exception {
-        }
-
-        @Override
-        public void keep(String line) throws Exception {
+        public void doLine(String line) throws Exception {
             writer.write(line);
             writer.newLine();
         }
