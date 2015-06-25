@@ -2,8 +2,11 @@ package cn.edu.fudan.se.dac.test;
 
 import cn.edu.fudan.se.dac.DACFactory;
 import cn.edu.fudan.se.dac.DataAccessInterface;
-import cn.edu.fudan.se.dac.test.bean.Lecture;
+import cn.edu.fudan.se.dac.test.bean.Student;
+import org.junit.After;
 import org.junit.Test;
+
+import java.io.File;
 
 import static org.junit.Assert.assertSame;
 
@@ -13,8 +16,13 @@ import static org.junit.Assert.assertSame;
 public class TestDACFactory {
     @Test
     public void testInstance() {
-        DataAccessInterface<Lecture> dac1 = DACFactory.getInstance().createDAC(Lecture.class);
-        DataAccessInterface<Lecture> dac2 = DACFactory.getInstance().createDAC(Lecture.class);
+        DataAccessInterface<Student> dac1 = DACFactory.getInstance().createDAC(Student.class);
+        DataAccessInterface<Student> dac2 = DACFactory.getInstance().createDAC(Student.class);
         assertSame(dac1, dac2);
+    }
+
+    @After
+    public void teardown() {
+        new File("Student").deleteOnExit();
     }
 }

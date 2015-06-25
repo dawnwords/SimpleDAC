@@ -84,7 +84,9 @@ class FileUtil {
     }
 
     static boolean overwrite(File src, File dst) {
-        return dst.delete() && src.renameTo(dst);
+        boolean result = dst.delete();
+        result =  src.renameTo(dst) && result;
+        return result;
     }
 
     interface BufferedWriterHandler {

@@ -6,7 +6,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -23,6 +22,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     private ReentrantReadWriteLock readWriteLock;
     private ReentrantLock transactionLock;
     private boolean committing;
+    private Thread transactionThread;
 
     private abstract class Action {
         private boolean createTemp;
@@ -34,14 +34,14 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         boolean execute() {
             if (committing) return modifyLogic();
 
-            if (transactionLock.isLocked()) {
+            if (currentThreadTransaction()) {
                 transaction.add(this);
                 return true;
             }
 
             readWriteLock.writeLock().lock();
             boolean result = modifyLogic();
-            if (createTemp) result = result && FileUtil.overwrite(tempFile, dataFile);
+            if (createTemp) result = FileUtil.overwrite(tempFile, dataFile) && result;
             readWriteLock.writeLock().unlock();
 
             return result;
@@ -178,6 +178,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     @Override
     public boolean beginTransaction() {
         transactionLock.lock();
+        transactionThread = Thread.currentThread();
         transaction.clear();
         return true;
     }
@@ -193,7 +194,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             action.performTransaction();
         }
         readWriteLock.writeLock().unlock();
-        transactionLock.unlock();
+        transactionUnlock();
         committing = false;
         return true;
     }
@@ -203,9 +204,18 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         if (!transactionLock.isLocked()) {
             throw new IllegalStateException("no transaction not begins");
         }
-        transaction.clear();
-        transactionLock.unlock();
+        transactionUnlock();
         return true;
+    }
+
+    private void transactionUnlock() {
+        transaction.clear();
+        transactionThread = null;
+        transactionLock.unlock();
+    }
+
+    private boolean currentThreadTransaction() {
+        return transactionLock.isLocked() && transactionThread == Thread.currentThread();
     }
 
     @Override
@@ -247,7 +257,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             @Override
             public void doLine(String line) throws Exception {
                 Bean bean = JSON.parseObject(line, beanClass);
-                if (transactionLock.isLocked()) {
+                if (currentThreadTransaction()) {
                     for (Action action : transaction) {
                         bean = action.modifyBean(bean);
                         if (bean == null) return;
@@ -259,7 +269,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             }
         });
 
-        if (transactionLock.isLocked()) {
+        if (currentThreadTransaction()) {
             traverseAddAction:
             for (int i = 0; i < transaction.size(); i++) {
                 Action action = transaction.get(i);

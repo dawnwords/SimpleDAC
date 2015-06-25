@@ -5,11 +5,9 @@ import cn.edu.fudan.se.dac.Condition;
 import cn.edu.fudan.se.dac.DACFactory;
 import cn.edu.fudan.se.dac.DataAccessInterface;
 import cn.edu.fudan.se.dac.test.bean.Student;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
-import org.junit.internal.runners.TestClassRunner;
-import org.junit.runner.RunWith;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -21,14 +19,13 @@ import static org.junit.Assert.assertTrue;
 /**
  * Created by Dawnwords on 2015/5/29.
  */
-@RunWith(TestClassRunner.class)
 public class TestDAC {
-    private static DataAccessInterface<Student> dac;
-    private static Condition<Student> condition;
-    private static BeanSetter<Student> setter;
+    private DataAccessInterface<Student> dac;
+    private Condition<Student> condition;
+    private BeanSetter<Student> setter;
 
-    @BeforeClass
-    public static void setup() {
+    @Before
+    public void setup() {
         dac = DACFactory.getInstance().createDAC(Student.class);
         condition = new Condition<Student>() {
             @Override
@@ -98,8 +95,9 @@ public class TestDAC {
         assertEquals(threadNum * studentNum, dac.selectByCondition(Condition.True).size());
     }
 
-    @AfterClass
-    public static void teardown() {
-        new File(Student.class.getSimpleName()).deleteOnExit();
+    @After
+    public void teardown() {
+        boolean deleted = new File("Student").delete();
+        System.out.println(deleted);
     }
 }
