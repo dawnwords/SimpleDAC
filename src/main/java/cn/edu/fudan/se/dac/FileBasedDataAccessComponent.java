@@ -20,8 +20,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
     private File dataFile, tempFile;
     private List<Action> transaction;
     private Class<Bean> beanClass;
-    private Lock readLock;
-    private Lock writeLock;
+    private ReentrantReadWriteLock readWriteLock;
     private ReentrantLock transactionLock;
     private boolean committing;
 
@@ -40,10 +39,10 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
                 return true;
             }
 
-            writeLock.lock();
+            readWriteLock.writeLock().lock();
             boolean result = modifyLogic();
             if (createTemp) result = result && FileUtil.overwrite(tempFile, dataFile);
-            writeLock.unlock();
+            readWriteLock.writeLock().unlock();
 
             return result;
         }
@@ -155,12 +154,10 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
 
     FileBasedDataAccessComponent(Class<Bean> beanClass) {
         this.beanClass = beanClass;
+        this.readWriteLock = new ReentrantReadWriteLock();
         this.transactionLock = new ReentrantLock();
         this.transaction = new ArrayList<Action>();
 
-        ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-        this.readLock = readWriteLock.readLock();
-        this.writeLock = readWriteLock.writeLock();
 
         String dataFileName = beanClass.getSimpleName();
         dataFile = new File(dataFileName);
@@ -191,11 +188,11 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             throw new IllegalStateException("no transaction not begins");
         }
         committing = true;
-        writeLock.lock();
+        readWriteLock.writeLock().lock();
         for (Action action : transaction) {
             action.performTransaction();
         }
-        writeLock.unlock();
+        readWriteLock.writeLock().unlock();
         transactionLock.unlock();
         committing = false;
         return true;
@@ -207,6 +204,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             throw new IllegalStateException("no transaction not begins");
         }
         transaction.clear();
+        transactionLock.unlock();
         return true;
     }
 
@@ -242,7 +240,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         if (condition == null) {
             throw new NullPointerException("condition is null");
         }
-        readLock.lock();
+        readWriteLock.readLock().lock();
         final List<Bean> result = new ArrayList<Bean>();
 
         FileUtil.eachLine(dataFile, new FileUtil.LineHandler() {
@@ -280,7 +278,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             }
         }
 
-        readLock.unlock();
+        readWriteLock.readLock().unlock();
         return result;
     }
 }
