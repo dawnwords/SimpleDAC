@@ -12,6 +12,15 @@ public class Lecture implements Serializable {
     private String name;
     private String teacher;
 
+    public Lecture() {
+    }
+
+    public Lecture(String id, String name, String teacher) {
+        this.id = id;
+        this.name = name;
+        this.teacher = teacher;
+    }
+
     public String getId() {
         return id;
     }
@@ -39,5 +48,24 @@ public class Lecture implements Serializable {
     @Override
     public String toString() {
         return JSON.toJSONString(this);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Lecture lecture = (Lecture) o;
+
+        return id.equals(lecture.id) && name.equals(lecture.name) && teacher.equals(lecture.teacher);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id.hashCode();
+        result = 31 * result + name.hashCode();
+        result = 31 * result + teacher.hashCode();
+        return result;
     }
 }

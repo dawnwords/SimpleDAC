@@ -1,8 +1,10 @@
 package cn.edu.fudan.se.dac.test;
 
+import cn.edu.fudan.se.dac.BeanSetter;
 import cn.edu.fudan.se.dac.Condition;
 import cn.edu.fudan.se.dac.DACFactory;
 import cn.edu.fudan.se.dac.DataAccessInterface;
+import cn.edu.fudan.se.dac.test.bean.Lecture;
 import cn.edu.fudan.se.dac.test.bean.Student;
 import org.junit.After;
 import org.junit.Test;
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by Dawnwords on 2015/6/25.
@@ -88,8 +91,84 @@ public class TestDACConcurrency {
         assertEquals(count + count, dac.selectByCondition(Condition.True).size());
     }
 
+    @Test
+    public void transactionWithDifferentTypeActions() throws InterruptedException {
+        final DataAccessInterface<Lecture> dac = DACFactory.getInstance().createDAC(Lecture.class);
+        dac.add(new Lecture("1", "1", "1"));
+        dac.beginTransaction();
+        dac.add(new Lecture("1", "1", "1"));
+        dac.add(new Lecture("2", "2", "2"));
+        dac.add(new Lecture("3", "3", "3"));
+        dac.deleteByCondition(new Condition<Lecture>() {
+            @Override
+            public boolean assertBean(Lecture lecture) {
+                return lecture.getId().equals("1");
+            }
+        });
+        dac.updateByCondition(new Condition<Lecture>() {
+            @Override
+            public boolean assertBean(Lecture lecture) {
+                return lecture.getId().equals("2");
+            }
+        }, new BeanSetter<Lecture>() {
+            @Override
+            public void set(Lecture lecture) {
+                lecture.setTeacher("haha");
+            }
+        });
+        new Thread() {
+            @Override
+            public void run() {
+                List<Lecture> lectures = dac.selectByCondition(Condition.True);
+                assertEquals(1, lectures.size());
+                assertTrue(lectures.contains(new Lecture("1", "1", "1")));
+            }
+        }.start();
+        Thread.sleep(1000);
+        dac.add(new Lecture("2", "4", "4"));
+
+        List<Lecture> lectures = dac.selectByCondition(Condition.True);
+        assertEquals(3, lectures.size());
+        assertTrue(lectures.contains(new Lecture("2", "2", "haha")));
+        assertTrue(lectures.contains(new Lecture("3", "3", "3")));
+        assertTrue(lectures.contains(new Lecture("2", "4", "4")));
+
+        dac.add(new Lecture("4", "5", "5"));
+        dac.deleteByCondition(new Condition<Lecture>() {
+            @Override
+            public boolean assertBean(Lecture lecture) {
+                return lecture.getId().equals("2");
+            }
+        });
+
+        lectures = dac.selectByCondition(Condition.True);
+        assertEquals(2, lectures.size());
+        assertTrue(lectures.contains(new Lecture("3", "3", "3")));
+        assertTrue(lectures.contains(new Lecture("4", "5", "5")));
+        new Thread() {
+            @Override
+            public void run() {
+                List<Lecture> lectures = dac.selectByCondition(Condition.True);
+                assertEquals(1, lectures.size());
+                assertTrue(lectures.contains(new Lecture("1", "1", "1")));
+            }
+        }.start();
+        Thread.sleep(1000);
+        dac.commit();
+        new Thread() {
+            @Override
+            public void run() {
+                List<Lecture> lectures = dac.selectByCondition(Condition.True);
+                assertEquals(2, lectures.size());
+                assertTrue(lectures.contains(new Lecture("3", "3", "3")));
+                assertTrue(lectures.contains(new Lecture("4", "5", "5")));
+            }
+        }.start();
+    }
+
     @After
     public void teardown() {
         System.out.println(new File(Student.class.getSimpleName()).delete());
+        System.out.println(new File(Lecture.class.getSimpleName()).delete());
     }
 }
