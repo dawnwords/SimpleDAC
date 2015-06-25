@@ -32,7 +32,7 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
         }
 
         boolean execute() {
-            if (committing) return modifyLogic();
+            if (committing) return getResult();
 
             if (currentThreadTransaction()) {
                 transaction.add(this);
@@ -40,12 +40,18 @@ final class FileBasedDataAccessComponent<Bean> implements DataAccessInterface<Be
             }
 
             readWriteLock.writeLock().lock();
-            boolean result = modifyLogic();
-            if (createTemp) result = FileUtil.overwrite(tempFile, dataFile) && result;
+            boolean result = getResult();
             readWriteLock.writeLock().unlock();
 
             return result;
         }
+
+        private boolean getResult() {
+            boolean result = modifyLogic();
+            if (createTemp) result = FileUtil.overwrite(tempFile, dataFile) && result;
+            return result;
+        }
+
 
         abstract Bean modifyBean(Bean bean);
 
